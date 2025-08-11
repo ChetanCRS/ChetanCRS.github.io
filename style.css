@@ -1,0 +1,175 @@
+/* Reset default margins and paddings */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Style for body */
+body {
+  background-image: url("./templates/bg.jpg");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed; /* Prevents background from scrolling */
+  font-family: 'Open Sans', sans-serif;
+  color: #fff;
+}
+
+/* Style for header */
+header {
+  text-align: center;
+  padding: 20px;
+  text-shadow: 1px 1px #676666;
+}
+
+.header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1400px; /* Match the main container width */
+  margin: 0 auto;
+}
+
+h1 {
+    font-size: 2rem;
+}
+
+.button {
+  padding: 10px 20px;
+  background-color: #333;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
+}
+
+.button:hover {
+    background-color: #555;
+}
+
+/* Main container is now constrained to the width of 3 wide cards + gaps */
+main {
+  max-width: 1400px;  /* (420px card * 3) + (40px gap * 2) = 1340px. 1400px gives nice padding. */
+  margin: 30px auto; /* Center the main container and add space from header */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
+  padding: 0 30px; /* Padding for spacing from the edge */
+}
+
+/* --- KEY CHANGE HERE for "Short and Wide" Cards --- */
+.card {
+  position: relative;
+  width: 420px;   /* WIDER width */
+  height: 280px;  /* SHORTER height */
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s ease-out;
+  background-color: #333;
+}
+
+/* Style for card image */
+.card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* This is crucial for wide cards, it prevents image stretching */
+  transition: transform 0.3s ease-out;
+}
+
+/* Style for card content */
+.card-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.4)); /* Faded gradient */
+  color: #fff;
+  padding: 20px;
+  transform: translateY(100%);
+  transition: transform 0.3s ease-out;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Hover effect for cards */
+.card:hover {
+  transform: scale(1.05);
+}
+
+.card:hover img {
+  transform: scale(1.1);
+}
+
+.card:hover .card-content {
+  transform: translateY(0%);
+}
+
+/* Style for card content text */
+.card-content h2 {
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+}
+
+.card-content p {
+  font-size: 1rem;
+  margin-bottom: 20px;
+}
+
+/* Style for card button */
+.card-content button {
+  position: absolute; /* Position button at the bottom */
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  width: calc(100% - 40px);
+  background-color: #fff;
+  color: #000;
+  padding: 12px;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  font-weight: bold;
+  transition: all 0.3s ease-out;
+  cursor: pointer;
+}
+
+.card-content button:hover {
+  background-color: #000;
+  color: #fff;
+}
+
+/* Footer styling */
+footer {
+  text-align: center;
+  background-color: #1a1a1a;
+  color: #fff;
+  padding: 15px;
+  width: 100%;
+  margin-top: 50px; /* Add space above footer */
+}
+
+/* --- UPDATED MEDIA QUERIES for WIDE Cards --- */
+/* For tablets: 2 cards per row */
+@media (max-width: 1400px) {
+  main {
+    max-width: 920px; /* (420px * 2) + 40px gap = 880px. 920px provides space. */
+  }
+}
+
+/* For smaller tablets and large phones: 1 card per row */
+@media (max-width: 920px) {
+  main {
+    max-width: 100%;
+    padding: 0 20px;
+  }
+  .card {
+    width: 100%;
+    max-width: 450px; /* Limit max width on mobile for better appearance */
+  }
+  .header-container {
+    flex-direction: column;
+    gap: 15px;
+  }
+}
