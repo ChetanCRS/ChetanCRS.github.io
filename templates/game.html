@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQuest: The Robot's Journey (Final Version)</title>
+    <style>
+        :root {
+            --color-bg-deep: #1a202c; --color-bg-main: #2d3748; --color-border: #4a5568;
+            --color-text-light: #e2e8f0; --color-text-med: #a0aec0; --color-green: #48bb78;
+            --color-red: #f56565; --color-blue: #4299e1; --color-orange: #ed8936;
+            --color-yellow: #f6e05e; --color-purple: #9f7aea; --color-trash: #c53030;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto+Mono:wght@400;700&display=swap');
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        body { font-family: 'Roboto Mono', monospace; background: var(--color-bg-deep); color: var(--color-text-light); text-shadow: 1px 1px 2px rgba(0,0,0,0.4); }
+        
+        /* --- NEW, ROBUST LAYOUT ENGINE --- */
+        #app-container { display: flex; width: 100%; height: 100%; }
+        .panel-container { width: 100%; height: 100%; background: var(--color-bg-main); display: flex; }
+        #game-panel {
+            flex: 1; padding: 20px; display: flex; flex-direction: column;
+            border-right: 2px solid var(--color-border); position: relative;
+            min-width: 0; /* Failsafe to allow shrinking */
+        }
+        #code-panel {
+            flex: 0 0 clamp(320px, 25vw, 400px); padding: 20px;
+            display: flex; flex-direction: column; background: rgba(0,0,0,0.1);
+        }
+        #canvas-wrapper {
+            flex-grow: 1; /* Take all available vertical space */
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 0; /* CRITICAL failsafe for flexbox */
+        }
+        #game-canvas {
+            position: absolute; /* Let JS handle position and size */
+            background: #171923; border: 1px solid var(--color-border);
+            image-rendering: pixelated;
+        }
+        /* --- END OF NEW LAYOUT ENGINE --- */
+
+        #game-header { text-align: center; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        #game-header h1 { font-family: 'Press Start 2P', cursive; color: var(--color-yellow); margin: 0; font-size: clamp(16px, 2vw, 22px); flex-grow: 1; text-align: center; }
+        .header-button { background: var(--color-red); color: white; border: none; padding: 8px 12px; font-family: 'Roboto Mono', monospace; font-weight: bold; cursor: pointer; border-radius: 5px; transition: background 0.2s; white-space: nowrap; }
+        .header-button:hover { background: #e53e3e; }
+        #level-info-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; min-height: 30px; }
+        #level-info { font-size: clamp(14px, 1.5vw, 16px); color: var(--color-text-light); }
+        #key-indicator { font-size: clamp(14px, 1.5vw, 16px); font-weight: bold; color: var(--color-yellow); background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 5px; opacity: 0; transition: opacity 0.3s; }
+        #key-indicator.visible { opacity: 1; }
+        #feedback-message { margin-top: auto; padding: 15px; border-radius: 5px; text-align: center; font-weight: bold; font-size: 16px; opacity: 0; transform: translateY(10px); transition: all 0.3s ease; height: 54px; }
+        #feedback-message.visible { opacity: 1; transform: translateY(0); }
+        #feedback-message.success { background: var(--color-green); color: var(--color-bg-deep); }
+        #feedback-message.error { background: var(--color-red); color: var(--color-bg-deep); }
+        #feedback-message.score { background: var(--color-blue); color: var(--color-bg-deep); }
+        .panel-header { text-align: center; margin-top: 0; font-size: 16px; color: var(--color-text-med); border-bottom: 1px solid var(--color-border); padding-bottom: 10px; letter-spacing: 2px; }
+        #block-palette, #script-area { padding: 10px; border-radius: 5px; }
+        #block-palette { margin-bottom: 15px; }
+        .code-block { padding: 12px 18px; margin-bottom: 10px; border-radius: 5px; font-weight: bold; text-align: center; cursor: grab; user-select: none; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: all 0.2s ease; border-bottom: 3px solid rgba(0,0,0,0.3); }
+        .code-block.highlight { box-shadow: 0 0 15px var(--color-yellow); transform: scale(1.02); }
+        .code-block:active { cursor: grabbing; transform: scale(1.05); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+        .code-block.dragging { opacity: 0.5; }
+        .block-move { background: var(--color-blue); } .block-turn { background: var(--color-green); } .block-loop { background: var(--color-orange); } .block-interact { background: var(--color-purple); } .block-wait { background: var(--color-yellow); color: var(--color-bg-deep);}
+        #script-area { flex-grow: 1; border: 2px dashed var(--color-border); overflow-y: auto; background: rgba(0,0,0,0.2); transition: background-color 0.3s ease; min-height: 150px; }
+        #script-area.drag-over { background-color: rgba(66, 153, 225, 0.2); }
+        #script-area .code-block { cursor: move; }
+        #script-area-placeholder { color: var(--color-text-med); text-align: center; padding-top: 50px; font-style: italic; pointer-events: none; }
+        #trash-area { text-align: center; padding: 20px; margin-top: 15px; border: 2px dashed var(--color-border); border-radius: 5px; color: var(--color-text-med); transition: all 0.3s ease; font-family: 'Press Start 2P', cursive; font-size: 18px; }
+        #trash-area.drag-over { background: var(--color-trash); color: var(--color-text-light); border-style: solid; transform: scale(1.05); }
+        #controls { display: flex; gap: 10px; margin-top: auto; padding-top: 20px; }
+        #controls button { flex-grow: 1; padding: 15px; font-family: 'Press Start 2P', cursive; font-size: 14px; border: none; border-radius: 5px; cursor: pointer; transition: all 0.2s ease; border-bottom: 4px solid rgba(0,0,0,0.4); }
+        #controls button:active:not(:disabled) { transform: translateY(2px); border-bottom-width: 2px; }
+        #controls button:disabled { cursor: not-allowed; filter: grayscale(80%); opacity: 0.6; }
+        #run-button { background: var(--color-green); color: var(--color-bg-deep); }
+        #reset-button { background: var(--color-red); color: var(--color-bg-deep); }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 32, 44, 0.95); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
+        .overlay.visible { opacity: 1; pointer-events: auto; }
+        .menu-title { font-family: 'Press Start 2P', cursive; font-size: clamp(32px, 5vw, 48px); color: var(--color-yellow); margin-bottom: 40px; text-align: center; }
+        .menu-button { font-family: 'Press Start 2P', cursive; font-size: clamp(18px, 3vw, 24px); color: var(--color-text-light); background: var(--color-blue); padding: 20px 40px; border-radius: 10px; cursor: pointer; transition: all 0.2s ease; margin-bottom: 20px; text-align: center; min-width: 300px;}
+        .menu-button:hover { transform: scale(1.05); background: #3182ce; }
+        .modal-content { background: var(--color-bg-main); padding: 40px; border-radius: 10px; max-width: 600px; text-align: left; border: 2px solid var(--color-border); }
+        .modal-content h2 { font-family: 'Press Start 2P', cursive; color: var(--color-yellow); }
+        .modal-content p { font-size: 16px; line-height: 1.8; }
+        .modal-content strong { color: var(--color-green); }
+        .options-group { margin: 20px 0; }
+        .options-group button { margin-right: 10px; }
+        .options-group .active { box-shadow: 0 0 10px var(--color-yellow); }
+        @media (max-width: 900px) {
+            .panel-container { flex-direction: column; }
+            #game-panel { border-right: none; flex-basis: 50%; min-height: 0; /* Failsafe */ }
+            #code-panel { flex: 1 1 50%; border-top: 2px solid var(--color-border); overflow-y: hidden; min-height: 0; /* Failsafe */ }
+            #code-panel-content-wrapper { overflow-y: auto; height: 100%; display: flex; flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu-overlay" class="overlay visible">
+        <h1 class="menu-title">CodeQuest</h1>
+        <div id="start-game-btn" class="menu-button">Start Game</div>
+        <div id="how-to-play-btn" class="menu-button">How to Play</div>
+        <div id="options-menu-btn" class="menu-button">Options</div>
+    </div>
+
+    <div id="how-to-play-modal" class="overlay">
+        <div class="modal-content">
+            <h2>How to Play</h2>
+            <p>Your goal is to guide the robot to the <strong>green flag</strong> on each level!</p>
+            <p>1. <strong>Drag blocks</strong> from the TOOLBOX into the YOUR SCRIPT area.</p>
+            <p>2. Use special blocks like <strong>INTERACT</strong> on keys/doors or <strong>WAIT</strong> to pause.</p>
+            <p>3. Try to beat the <strong>Par Score</strong> by using the fewest blocks possible!</p>
+            <p>4. Press <strong>RUN</strong> to execute your code!</p>
+            <div id="close-how-to-play-btn" class="menu-button" style="margin-top: 30px; font-size: 18px;">Got It!</div>
+        </div>
+    </div>
+    
+    <div id="options-modal" class="overlay">
+        <div class="modal-content">
+            <h2>Options</h2>
+            <div class="options-group">
+                <p><strong>Sound:</strong></p>
+                <button id="sound-toggle-btn" class="menu-button" style="font-size:16px;">Mute</button>
+            </div>
+            <div class="options-group">
+                <p><strong>Game Speed:</strong></p>
+                <button id="speed-slow" class="menu-button" style="font-size:16px;">Slow</button>
+                <button id="speed-normal" class="menu-button active" style="font-size:16px;">Normal</button>
+                <button id="speed-fast" class="menu-button" style="font-size:16px;">Fast</button>
+            </div>
+             <div id="close-options-btn" class="menu-button" style="margin-top: 30px; font-size: 18px;">Back</div>
+        </div>
+    </div>
+
+    <div id="app-container" style="visibility: hidden;">
+        <div class="panel-container">
+            <div id="game-panel">
+                <div id="game-header">
+                    <button id="exit-button" class="header-button">EXIT</button>
+                    <h1>CodeQuest</h1>
+                    <button id="options-ingame-btn" class="header-button" style="background: var(--color-blue);">Options</button>
+                    <div id="score-display" class="header-button" style="background: var(--color-purple);">Score: 0</div>
+                </div>
+                <div id="level-info-bar">
+                    <div id="level-info"></div>
+                    <div id="key-indicator">🔑 Key Obtained!</div>
+                </div>
+                <div id="canvas-wrapper">
+                    <canvas id="game-canvas"></canvas>
+                </div>
+                <div id="feedback-message"></div>
+            </div>
+            <div id="code-panel">
+                <div id="code-panel-content-wrapper">
+                    <h2 class="panel-header">TOOLBOX</h2>
+                    <div id="block-palette"></div>
+                    <h2 class="panel-header">YOUR SCRIPT</h2>
+                    <div id="script-area">
+                        <div id="script-area-placeholder">Drag blocks here!</div>
+                    </div>
+                    <div id="trash-area">TRASH</div>
+                    <div id="controls">
+                        <button id="run-button">RUN</button>
+                        <button id="reset-button">RESET</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const gameState = {
+            currentLevel: 0, totalScore: 0, isRunning: false, animationFrameId: null,
+            isMuted: false, gameSpeed: 400, // Normal speed
+            player: { x: 0, y: 0, anim: {x:0, y:0}, dir: 0, hasKey: false },
+            levelData: {}, particles: []
+        };
+        const elements = {
+            appContainer: document.getElementById('app-container'), menuOverlay: document.getElementById('menu-overlay'),
+            howToPlayModal: document.getElementById('how-to-play-modal'), optionsModal: document.getElementById('options-modal'),
+            canvas: document.getElementById('game-canvas'), ctx: document.getElementById('game-canvas').getContext('2d'), 
+            levelInfo: document.getElementById('level-info'), keyIndicator: document.getElementById('key-indicator'), 
+            feedback: document.getElementById('feedback-message'), scoreDisplay: document.getElementById('score-display'),
+            runBtn: document.getElementById('run-button'), resetBtn: document.getElementById('reset-button'),
+            exitBtn: document.getElementById('exit-button'), startGameBtn: document.getElementById('start-game-btn'),
+            howToPlayBtn: document.getElementById('how-to-play-btn'), closeModalBtn: document.getElementById('close-how-to-play-btn'),
+            optionsMenuBtn: document.getElementById('options-menu-btn'), optionsIngameBtn: document.getElementById('options-ingame-btn'),
+            closeOptionsBtn: document.getElementById('close-options-btn'), soundToggleBtn: document.getElementById('sound-toggle-btn'),
+            speedSlowBtn: document.getElementById('speed-slow'), speedNormalBtn: document.getElementById('speed-normal'), speedFastBtn: document.getElementById('speed-fast'),
+            blockPalette: document.getElementById('block-palette'), scriptArea: document.getElementById('script-area'),
+            placeholder: document.getElementById('script-area-placeholder'), trashArea: document.getElementById('trash-area')
+        };
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        function playSound(type) {
+            if (!audioCtx || gameState.isMuted) return;
+            const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+            o.connect(g); g.connect(audioCtx.destination); g.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            switch (type) {
+                case 'drop': o.frequency.setValueAtTime(200, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3); break;
+                case 'move': o.type = 'square'; o.frequency.setValueAtTime(150, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1); break;
+                case 'success': o.frequency.setValueAtTime(523, audioCtx.currentTime); o.frequency.linearRampToValueAtTime(1046, audioCtx.currentTime + 0.2); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4); break;
+                case 'fail': o.type = 'sawtooth'; o.frequency.setValueAtTime(200, audioCtx.currentTime); o.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.3); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3); break;
+                case 'key': o.frequency.setValueAtTime(880, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2); break;
+                case 'trash': o.type = 'square'; o.frequency.setValueAtTime(100, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2); break;
+            }
+            o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime + 0.5);
+        }
+        const levels = [
+            { par: 6, title: "First Steps", gridSize: 8, playerStart: { x: 1, y: 4 }, walls: [], objects: [{type:'goal', x:6, y:4}], availableBlocks: ['move_forward', 'turn_right'] },
+            { par: 8, title: "A Simple Turn", gridSize: 8, playerStart: { x: 1, y: 1 }, walls: [ {x: 3, y: 0}, {x: 3, y: 1}, {x: 3, y: 2}, {x: 4, y: 2}, {x: 5, y: 2} ], objects: [{type:'goal', x:6, y:6}], availableBlocks: ['move_forward', 'turn_right', 'turn_left'] },
+            { par: 4, title: "Power of Loops", gridSize: 10, playerStart: { x: 1, y: 5 }, walls: [], objects: [{type:'goal', x:8, y:5}], availableBlocks: ['move_forward', 'repeat_5'] },
+            { par: 9, title: "The Key", gridSize: 8, playerStart: { x: 1, y: 1 }, walls: [{type:'door', x: 4, y: 4}], objects: [{type:'key', x:6, y:1}, {type:'goal', x:6, y:6}], availableBlocks: ['move_forward', 'turn_right', 'interact'] },
+            { par: 15, title: "The Detour", gridSize: 10, playerStart: { x: 1, y: 1}, walls: [{x:5,y:0},{x:5,y:1},{x:5,y:2},{x:5,y:3},{x:5,y:4}, {type:'door', x:5,y:5}, {x:5,y:6},{x:5,y:7}], objects: [{type:'key', x:8,y:8},{type:'goal', x:1,y:8}], availableBlocks: ['move_forward', 'turn_right', 'turn_left', 'interact'] },
+            { par: 5, title: "Patience is a Virtue", gridSize: 8, playerStart: { x: 1, y: 4}, walls: [], objects:[{type:'goal', x:6, y:4}, {type:'wait_pad', x:3, y:4}], availableBlocks:['move_forward', 'wait']},
+            { par: 10, title: "Spike Trap", gridSize: 8, playerStart: { x: 1, y: 1}, walls: [{x:4, y:0},{x:4, y:1},{x:4, y:2},{type:'spikes', x:4, y:3},{x:4, y:4},{x:4, y:5}], objects: [{type:'goal', x:6, y:3}], availableBlocks: ['move_forward', 'turn_right', 'turn_left', 'wait']},
+            { par: 10, title: "Final Challenge", gridSize: 10, playerStart: { x: 0, y: 5 }, walls: [{type:'door', x:5,y:5}], objects: [{type:'key', x:9,y:0},{type:'goal', x:9,y:9}], availableBlocks: ['move_forward', 'turn_left', 'repeat_5', 'interact']},
+            { title: "You Win!" }
+        ];
+        const blockTypes = {
+            'move_forward': { text: 'MOVE FORWARD', class: 'block-move' }, 'turn_right': { text: 'TURN RIGHT', class: 'block-turn' },
+            'turn_left': { text: 'TURN LEFT', class: 'block-turn' }, 'repeat_5': { text: 'REPEAT 5x', class: 'block-loop' },
+            'interact': { text: 'INTERACT', class: 'block-interact' }, 'wait': { text: 'WAIT', class: 'block-wait' }
+        };
+        const COLORS = { grid: '#4a5568', player: '#4299e1', goal: '#48bb78', wall: '#a0aec0', robotEye: '#f6e05e', key: '#f6e05e', door: '#c05621', wait_pad: '#6b46c1', spikes: '#c53030' };
+        let tileSize = 50;
+        
+        function resizeCanvas() {
+            const { canvas } = elements;
+            const wrapper = document.getElementById('canvas-wrapper');
+            const size = Math.min(wrapper.clientWidth, wrapper.clientHeight);
+            canvas.style.width = `${size}px`;
+            canvas.style.height = `${size}px`;
+            canvas.width = size;
+            canvas.height = size;
+            if (gameState.levelData.gridSize) tileSize = canvas.width / gameState.levelData.gridSize;
+        }
+        
+        function drawGame() {
+            const { ctx, canvas } = elements;
+            const { player, levelData, particles } = gameState;
+            if (!levelData.gridSize || !ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = COLORS.grid;
+            for (let i = 1; i < levelData.gridSize; i++) {
+                ctx.beginPath(); ctx.moveTo(i * tileSize, 0); ctx.lineTo(i * tileSize, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i * tileSize); ctx.lineTo(canvas.width, i * tileSize); ctx.stroke();
+            }
+            levelData.objects.forEach(o => {
+                if(o.type === 'goal') { ctx.fillStyle = COLORS.goal; ctx.fillRect(o.x*tileSize, o.y*tileSize, tileSize, tileSize); }
+                if(o.type === 'key') { ctx.fillStyle = COLORS.key; ctx.fillRect(o.x*tileSize + tileSize*0.2, o.y*tileSize + tileSize*0.2, tileSize*0.6, tileSize*0.6); }
+                if(o.type === 'wait_pad') { ctx.fillStyle = COLORS.wait_pad; ctx.fillRect(o.x*tileSize, o.y*tileSize, tileSize, tileSize); }
+            });
+            levelData.walls.forEach(w => {
+                ctx.fillStyle = w.type === 'door' ? COLORS.door : (w.type === 'spikes' ? COLORS.spikes : COLORS.wall);
+                ctx.fillRect(w.x * tileSize, w.y * tileSize, tileSize, tileSize);
+            });
+            const px = player.anim.x * tileSize, py = player.anim.y * tileSize;
+            ctx.fillStyle = COLORS.player;
+            ctx.fillRect(px + tileSize * 0.1, py + tileSize * 0.1, tileSize * 0.8, tileSize * 0.8);
+            ctx.fillStyle = COLORS.robotEye;
+            const eyeX = px + tileSize/2 + Math.cos(player.dir * Math.PI/2) * tileSize * 0.25;
+            const eyeY = py + tileSize/2 + Math.sin(player.dir * Math.PI/2) * tileSize * 0.25;
+            ctx.beginPath(); ctx.arc(eyeX, eyeY, tileSize * 0.1, 0, Math.PI * 2); ctx.fill();
+        }
+        function gameLoop() {
+            gameState.player.anim.x += (gameState.player.x - gameState.player.anim.x) * 0.2;
+            gameState.player.anim.y += (gameState.player.y - gameState.player.anim.y) * 0.2;
+            drawGame();
+            gameState.animationFrameId = requestAnimationFrame(gameLoop);
+        }
+        function setFeedback(message, type = '') { elements.feedback.textContent = message; elements.feedback.className = type ? `visible ${type}` : ''; }
+        function loadLevel(levelIndex) {
+            gameState.currentLevel = levelIndex;
+            const levelTemplate = levels[levelIndex];
+            if (!levelTemplate || !levelTemplate.gridSize) {
+                if (gameState.animationFrameId) cancelAnimationFrame(gameState.animationFrameId);
+                elements.appContainer.innerHTML = `<div class="overlay visible"><h1 class="menu-title">YOU WIN!<br><br>Total Score: ${gameState.totalScore}</h1></div>`;
+                return;
+            }
+            gameState.levelData = {
+                ...levelTemplate,
+                walls: levelTemplate.walls.map(w => ({...w})),
+                objects: levelTemplate.objects.map(o => ({...o}))
+            };
+            gameState.player = { x: levelTemplate.playerStart.x, y: levelTemplate.playerStart.y, anim: {...levelTemplate.playerStart}, dir: 0, hasKey: false };
+            elements.keyIndicator.classList.remove('visible');
+            elements.levelInfo.innerText = `Level ${levelIndex + 1}: ${levelTemplate.title}`;
+            setFeedback("");
+            buildBlockPalette();
+            resetScript();
+            resizeCanvas();
+            if (gameState.animationFrameId) cancelAnimationFrame(gameState.animationFrameId);
+            gameLoop();
+        }
+        function buildBlockPalette() {
+            elements.blockPalette.innerHTML = '';
+            gameState.levelData.availableBlocks.forEach(blockId => {
+                const blockInfo = blockTypes[blockId];
+                if (!blockInfo) return;
+                const blockEl = document.createElement('div');
+                blockEl.className = `code-block ${blockInfo.class}`;
+                blockEl.textContent = blockInfo.text;
+                blockEl.dataset.type = blockId;
+                blockEl.draggable = true;
+                elements.blockPalette.appendChild(blockEl);
+            });
+        }
+        function updateUI(isExecuting) {
+            gameState.isRunning = isExecuting;
+            elements.runBtn.disabled = isExecuting;
+            elements.resetBtn.disabled = isExecuting;
+        }
+        async function runScript() {
+            if (gameState.isRunning) return;
+            updateUI(true);
+            const scriptBlocks = [...elements.scriptArea.querySelectorAll('.code-block')];
+            let commands = [];
+            scriptBlocks.forEach(block => {
+                const type = block.dataset.type;
+                if (type === 'repeat_5') { for (let i = 0; i < 5; i++) commands.push({type: 'move_forward', el: block}); }
+                else { commands.push({type: type, el: block}); }
+            });
+            for (const command of commands) {
+                if (!gameState.isRunning) break;
+                command.el.classList.add('highlight');
+                executeCommand(command.type);
+                if (checkCollision()) {
+                    setFeedback("Oops! You hit something.", 'error'); playSound('fail');
+                    updateUI(false); return;
+                }
+                const onWaitPad = gameState.levelData.objects.some(o => o.type === 'wait_pad' && o.x === gameState.player.x && o.y === gameState.player.y);
+                await new Promise(resolve => setTimeout(resolve, onWaitPad ? gameState.gameSpeed * 2 : gameState.gameSpeed));
+                command.el.classList.remove('highlight');
+            }
+            if(gameState.isRunning) checkWinCondition(scriptBlocks.length);
+            updateUI(false);
+        }
+        function executeCommand(command) {
+            playSound('move');
+            const { player, levelData } = gameState;
+            if (command === 'move_forward') { if (player.dir === 0) player.x++; else if (player.dir === 1) player.y++; else if (player.dir === 2) player.x--; else if (player.dir === 3) player.y--; }
+            else if (command === 'turn_right') { player.dir = (player.dir + 1) % 4; }
+            else if (command === 'turn_left') { player.dir = (player.dir + 3) % 4; }
+            else if (command === 'wait') { /* Does nothing, just waits for timeout in runScript */ }
+            else if (command === 'interact') {
+                const keyIndex = levelData.objects.findIndex(o => o.type === 'key' && o.x === player.x && o.y === player.y);
+                if (keyIndex > -1) { player.hasKey = true; levelData.objects.splice(keyIndex, 1); elements.keyIndicator.classList.add('visible'); playSound('key'); }
+                const doorIndex = levelData.walls.findIndex(w => w.type === 'door' && w.x === player.x && w.y === player.y);
+                if (doorIndex > -1 && player.hasKey) { levelData.walls.splice(doorIndex, 1); playSound('key'); }
+            }
+        }
+        function checkCollision() {
+            const { player, levelData } = gameState;
+            if (player.x < 0 || player.x >= levelData.gridSize || player.y < 0 || player.y >= levelData.gridSize) return true;
+            return levelData.walls.some(wall => wall.x === player.x && wall.y === player.y);
+        }
+        function checkWinCondition(blockCount) {
+            const goal = gameState.levelData.objects.find(o => o.type === 'goal');
+            if (!goal) return;
+            if (gameState.player.x === goal.x && gameState.player.y === goal.y) {
+                playSound('success');
+                const par = gameState.levelData.par; let rating = "Completed!";
+                if (blockCount <= par) rating = "Perfect!"; else if (blockCount <= par + 2) rating = "Great!";
+                setFeedback(`Score: ${blockCount} (Par: ${par}) - ${rating}`, 'score');
+                gameState.totalScore += blockCount;
+                elements.scoreDisplay.textContent = `Score: ${gameState.totalScore}`;
+                updateUI(false);
+                setTimeout(() => loadLevel(gameState.currentLevel + 1), 3000);
+            } else if (!elements.feedback.classList.contains('error')) { setFeedback("Not quite! Reset and try again.", 'error'); playSound('fail'); }
+        }
+        function resetScript() { elements.scriptArea.innerHTML = ''; elements.scriptArea.appendChild(elements.placeholder); updatePlaceholder(); }
+        function updatePlaceholder() { elements.placeholder.style.display = elements.scriptArea.querySelector('.code-block') ? 'none' : 'block'; }
+        let draggedEl = null;
+        function attachAllListeners() {
+            document.addEventListener('dragstart', e => { if (e.target.classList.contains('code-block')) { initAudio(); draggedEl = e.target; setTimeout(() => e.target.classList.add('dragging'), 0); } });
+            document.addEventListener('dragend', e => { if (draggedEl) { draggedEl.classList.remove('dragging'); draggedEl = null; elements.trashArea.classList.remove('drag-over'); elements.scriptArea.classList.remove('drag-over'); } });
+            elements.scriptArea.addEventListener('dragover', e => {
+                e.preventDefault(); elements.scriptArea.classList.add('drag-over');
+                const afterElement = [...elements.scriptArea.querySelectorAll('.code-block:not(.dragging)')].reduce((closest, child) => { const box = child.getBoundingClientRect(); const offset = e.clientY - box.top - box.height / 2; if (offset < 0 && offset > closest.offset) return { offset, element: child }; else return closest; }, { offset: Number.NEGATIVE_INFINITY }).element;
+                const currentlyDragged = document.querySelector('.dragging');
+                if (currentlyDragged) { if (afterElement == null) elements.scriptArea.appendChild(currentlyDragged); else elements.scriptArea.insertBefore(currentlyDragged, afterElement); }
+            });
+            elements.scriptArea.addEventListener('dragleave', () => elements.scriptArea.classList.remove('drag-over'));
+            elements.scriptArea.addEventListener('drop', e => {
+                e.preventDefault();
+                if (draggedEl && draggedEl.parentElement.id === 'block-palette') {
+                    const newBlock = draggedEl.cloneNode(true);
+                    elements.scriptArea.replaceChild(newBlock, draggedEl);
+                    draggedEl = newBlock;
+                }
+                playSound('drop'); updatePlaceholder();
+            });
+            elements.trashArea.addEventListener('dragover', e => { e.preventDefault(); elements.trashArea.classList.add('drag-over'); });
+            elements.trashArea.addEventListener('dragleave', () => elements.trashArea.classList.remove('drag-over'));
+            elements.trashArea.addEventListener('drop', e => { e.preventDefault(); if (draggedEl && draggedEl.parentElement.id === 'script-area') { draggedEl.remove(); playSound('trash'); } elements.trashArea.classList.remove('drag-over'); updatePlaceholder(); });
+            elements.exitBtn.addEventListener('click', () => { window.history.back(); });
+            elements.startGameBtn.addEventListener('click', () => { initAudio(); elements.menuOverlay.classList.remove('visible'); elements.appContainer.style.visibility = 'visible'; loadLevel(0); });
+            elements.howToPlayBtn.addEventListener('click', () => { elements.howToPlayModal.classList.add('visible'); });
+            elements.closeModalBtn.addEventListener('click', () => { elements.howToPlayModal.classList.remove('visible'); });
+            const openOptions = () => elements.optionsModal.classList.add('visible');
+            elements.optionsMenuBtn.addEventListener('click', openOptions);
+            elements.optionsIngameBtn.addEventListener('click', openOptions);
+            elements.closeOptionsBtn.addEventListener('click', () => { elements.optionsModal.classList.remove('visible'); });
+            elements.soundToggleBtn.addEventListener('click', () => {
+                gameState.isMuted = !gameState.isMuted;
+                elements.soundToggleBtn.textContent = gameState.isMuted ? "Unmute" : "Mute";
+                elements.soundToggleBtn.style.background = gameState.isMuted ? 'var(--color-red)' : '';
+            });
+            const speedButtons = { slow: elements.speedSlowBtn, normal: elements.speedNormalBtn, fast: elements.speedFastBtn };
+            const speedValues = { slow: 800, normal: 400, fast: 200 };
+            for(const speed in speedButtons){
+                speedButtons[speed].addEventListener('click', () => {
+                    gameState.gameSpeed = speedValues[speed];
+                    for(const s in speedButtons) speedButtons[s].classList.remove('active');
+                    speedButtons[speed].classList.add('active');
+                });
+            }
+            elements.runBtn.addEventListener('click', runScript);
+            elements.resetBtn.addEventListener('click', () => { if (!gameState.isRunning) { setFeedback(""); loadLevel(gameState.currentLevel); } });
+            window.addEventListener('resize', resizeCanvas);
+        }
+        attachAllListeners();
+    });
+    </script>
+</body>
+</html>
