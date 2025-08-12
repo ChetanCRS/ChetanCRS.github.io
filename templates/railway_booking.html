@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IRCTC Clone - Professional Booking Simulation</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+        :root {
+            --bg-primary: #1c1e2d; --bg-secondary: #2a2a4e; --bg-card: #1c1e2d;
+            --text-primary: #f0f3f5; --text-secondary: #a9b1d6; --brand-primary: #ff7043;
+            --brand-secondary: #7e57c2; --border-color: #4a4a8a; --font-base: 16px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100vw; height: 100vh; overflow: hidden;
+            background-color: var(--bg-primary);
+            font-family: 'Roboto', sans-serif; color: var(--text-primary);
+            font-size: var(--font-base);
+        }
+        .app-container { display: flex; flex-direction: column; width: 100%; height: 100%; }
+        .app-header { display: flex; padding: 15px 30px; background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); }
+        .logo { font-size: 24px; font-weight: 700; color: var(--brand-primary); }
+        .app-main { flex-grow: 1; overflow-y: auto; }
+        .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 25px; }
+        h2 { font-size: 24px; margin-bottom: 20px; }
+        .btn, input, select {
+            width: 100%; padding: 12px; font-size: var(--font-base); font-family: inherit;
+            border: 1px solid var(--border-color); border-radius: 6px;
+            background-color: var(--bg-secondary); color: var(--text-primary);
+        }
+        input:focus, select:focus { outline: none; border-color: var(--brand-primary); }
+        .btn { cursor: pointer; font-weight: 700; text-align: center; }
+        .btn-primary { background-color: var(--brand-primary); border-color: var(--brand-primary); color: white; }
+        .home-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; padding: 30px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary); }
+        .side-panel .card { margin-bottom: 30px; text-align: center; }
+        .train-list-item { display: grid; grid-template-columns: 3fr 1fr 1.5fr; align-items: center; gap: 15px; padding: 20px; }
+        .train-details h3 { font-size: var(--font-base); font-weight: 500; }
+        .train-details p { color: var(--text-secondary); font-size: 0.9rem; }
+        .train-fare { font-size: 24px; font-weight: 700; color: var(--brand-secondary); }
+        .ticket-page { display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--bg-primary); z-index: 200; padding: 40px; }
+        .ticket-container { width: 100%; height: 100%; border: 2px solid var(--brand-primary); background-color: white; color: #0d1117; display: flex; flex-direction: column; }
+        .ticket-header, .ticket-footer { background-color: #e9ecef; padding: 20px; text-align: center; border-bottom: 1px solid #dee2e6; }
+        .ticket-body { flex-grow: 1; padding: 30px; display: grid; grid-template-columns: 2fr 1fr; gap: 30px; }
+        .ticket-pnr { font-size: 24px; font-weight: 700; color: var(--brand-primary); }
+        .ticket-passenger-list table { width: 100%; text-align: left; border-collapse: collapse; margin-top: 20px; }
+        .ticket-passenger-list th, .ticket-passenger-list td { padding: 8px; border-bottom: 1px solid #dee2e6; }
+        #print-btn { background-color: var(--brand-secondary); color: white; }
+        @media print { body * { visibility: hidden; } .ticket-page, .ticket-page * { visibility: visible; } .ticket-page { position: absolute; left: 0; top: 0; width: 100%; height: auto; padding: 0; } .ticket-container{border:none;} .ticket-footer{display:none;} }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header"><div class="logo">RailConnect</div></header>
+        <main id="app" class="app-main"></main>
+    </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const app = document.getElementById('app');
+        const state = { view: 'home', trains: [], booking: {} };
+
+        const cleanStationName = name => name.split('(')[0].trim();
+
+        const render = () => {
+            if (state.view === 'home') {
+                const trainsHTML = state.trains.map(train => `
+                    <div class="card train-list-item">
+                        <div class="train-details"><h3>${train.name}</h3><p>${train.time}</p></div>
+                        <div class="train-fare">₹ ${train.fare}.00</div>
+                        <div><button class="btn btn-primary book-now-btn" data-train-name="${train.name}" data-fare="${train.fare}">Book Now</button></div>
+                    </div>`).join('');
+
+                app.innerHTML = `
+                    <div class="home-grid">
+                        <div class="main-booking">
+                            <div class="card">
+                                <h2>Plan Your Journey</h2>
+                                <div class="form-group"><label>From</label><input type="text" id="from-station" value="MUMBAI (CSMT)"></div>
+                                <div class="form-group"><label>To</label><input type="text" id="to-station" value="NEW DELHI (NDLS)"></div>
+                                <div class="form-group"><label>Date</label><input type="date" id="journey-date"></div>
+                                <div class="form-group"><label>Passengers</label><input type="number" id="passenger-count" value="1" min="1" max="6"></div>
+                                <div style="margin-top: 20px;"><button id="search-trains-btn" class="btn btn-primary">Search Trains</button></div>
+                            </div>
+                            <div id="train-list-container" class="card" style="margin-top: 30px; ${state.trains.length === 0 ? 'display: none;' : ''}">
+                                <h2>Available Trains</h2>
+                                <div id="train-list">${trainsHTML}</div>
+                            </div>
+                        </div>
+                        <div class="side-panel">
+                            <div class="card"><h3>Services</h3><p style="color:var(--text-secondary); font-size:0.9rem;">Flights, Hotels & More</p></div>
+                            <div class="card"><h3>Advertisements</h3><p style="color:var(--text-secondary); font-size:0.9rem;">Exclusive offers on your next trip.</p></div>
+                        </div>
+                    </div>`;
+                document.getElementById('journey-date').valueAsDate = new Date();
+            } else if (state.view === 'ticket') {
+                const b = state.booking;
+                let passengersHTML = '';
+                for(let i=1; i<=b.passengers; i++) passengersHTML += `<tr><td>${i}</td><td>Passenger ${i}</td><td>--</td><td>--</td><td>CNF / ${['SL','3A','2A'][Math.floor(Math.random()*3)]}-${Math.floor(Math.random()*70)+1}</td></tr>`;
+                
+                app.innerHTML = `
+                    <div id="page-ticket" class="ticket-page">
+                        <div class="ticket-container">
+                            <div class="ticket-header"><h1>Electronic Reservation Slip</h1></div>
+                            <div class="ticket-body">
+                                <div>
+                                    <h2 style="color:var(--brand-primary)">Journey Details</h2>
+                                    <p><strong>PNR:</strong> <span class="ticket-pnr">${b.pnr}</span></p>
+                                    <p><strong>Train:</strong> ${b.trainName}</p>
+                                    <p><strong>From:</strong> ${b.from.toUpperCase()} <strong>To:</strong> ${b.to.toUpperCase()}</p>
+                                    <p><strong>Date:</strong> ${new Date(b.date).toDateString()}</p>
+                                    <hr style="border-color:#dee2e6;margin:20px 0;">
+                                    <h3>Passengers</h3>
+                                    <div class="ticket-passenger-list">
+                                        <table style="width:100%;"><thead><tr><th style="padding:8px;">#</th><th>Name</th><th>Age</th><th>Gender</th><th>Status/Seat</th></tr></thead><tbody>${passengersHTML}</tbody></table>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h2>Fare & Payment</h2>
+                                    <p><strong>Total Fare:</strong> ₹ ${b.fare}.00</p>
+                                    <p><strong>Payment Method:</strong> Dummy Credit Card</p>
+                                </div>
+                            </div>
+                            <div class="ticket-footer">
+                                <button id="print-btn" class="btn btn-primary">Print</button>
+                                <button id="back-to-home-btn" class="btn" style="background:var(--text-secondary);color:var(--text-dark);">Book Another</button>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+        };
+
+        app.addEventListener('click', (e) => {
+            if (e.target.id === 'search-trains-btn') {
+                const from = document.getElementById('from-station').value;
+                const to = document.getElementById('to-station').value;
+                const passengers = parseInt(document.getElementById('passenger-count').value);
+                state.booking = { from, to, date: document.getElementById('journey-date').value, passengers };
+                state.trains = [];
+                for(let i = 1; i <= 5; i++) {
+                    state.trains.push({
+                        name: `${cleanStationName(from)} - ${cleanStationName(to)} Express #${i}`,
+                        time: `${Math.floor(Math.random()*12+6).toString().padStart(2,'0')}:${Math.floor(Math.random()*60).toString().padStart(2,'0')} → ${Math.floor(Math.random()*12+18).toString().padStart(2,'0')}:${Math.floor(Math.random()*60).toString().padStart(2,'0')}`,
+                        fare: passengers * (Math.floor(Math.random()*1000)+500)
+                    });
+                }
+                render();
+            }
+            if (e.target.classList.contains('book-now-btn')) {
+                state.booking.trainName = e.target.dataset.trainName;
+                state.booking.fare = e.target.dataset.fare;
+                state.booking.pnr = Math.random().toString(36).substring(2, 12).toUpperCase();
+                state.view = 'ticket';
+                render();
+            }
+            if (e.target.id === 'back-to-home-btn') {
+                state.view = 'home';
+                state.trains = [];
+                render();
+            }
+            if (e.target.id === 'print-btn') window.print();
+        });
+
+        render(); // Initial render of the homepage
+    });
+    </script>
+</body>
+</html>
