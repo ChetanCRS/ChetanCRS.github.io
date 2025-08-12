@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Report: Compact Urban Model</title>
+    <meta name="description" content="Developed a Python program to model simplified city grids and demonstrate how layout changes affect neighborhood accessibility.">
+
+    <!-- EMBEDDED CSS: Highly detailed styling for a professional, software-like feel -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;700&family=Fira+Code&display=swap');
+
+        :root {
+            --bg-primary: #0d1117; --bg-secondary: #161b22;
+            --text-primary: #e6edf3; --text-secondary: #7d8590; --accent-primary: #58a6ff;
+            --accent-secondary: #3fb950; --accent-danger: #f85149; --border-color: #30363d;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            background-color: var(--bg-primary);
+            font-family: 'Exo 2', sans-serif; color: var(--text-primary);
+            line-height: 1.8;
+        }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        
+        .hero-header { text-align: center; padding: 60px 20px; margin-bottom: 50px; border-bottom: 1px solid var(--border-color); }
+        .hero-header h1 { font-size: 3rem; font-weight: 700; color: white; margin-bottom: 15px; }
+        .hero-header .subtitle { font-size: 1.1rem; color: var(--text-secondary); max-width: 65ch; margin: 0 auto; }
+
+        .report-section { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 40px; margin-bottom: 40px; opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+        .report-section.visible { opacity: 1; transform: translateY(0); }
+
+        h2 { font-size: 1.8rem; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); color: white; }
+        h3 { font-size: 1.3rem; margin-top: 25px; margin-bottom: 15px; color: var(--accent-primary); }
+        p { font-size: 1rem; color: var(--text-primary); margin-bottom: 15px; max-width: 70ch; }
+        strong { color: var(--accent-primary); font-weight: 700; }
+
+        .case-study-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; }
+        .scenario h4 { font-size: 1.1rem; text-align: center; margin-bottom: 15px; color: var(--text-secondary); }
+        .city-diagram { display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(10, 1fr); gap: 5px; background-color: var(--bg-primary); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); aspect-ratio: 1 / 1; }
+        .plot { border-radius: 4px; display: flex; justify-content: center; align-items: center; }
+        .res { background-color: #2980b9; } .com { background-color: #8e44ad; }
+        .park { background-color: #27ae60; display: grid; grid-template-columns: 1fr 1fr; gap: 20%; padding: 15%; }
+        .park .tree { background-color: #2ea043; border-radius: 50%; }
+        .transit { background-color: #f1c40f; font-weight: 700; color: #0d1117; font-size: 1.5em; }
+        .road { background-color: #34495e; }
+        .skyscraper { background-color: #7d8590; display: grid; grid-template-columns: 1fr 1fr; gap: 15%; padding: 10%; }
+        .skyscraper .window { background-color: #58a6ff; opacity: 0.7; border-radius: 2px; }
+        
+        .analysis-box { margin-top: 20px; padding: 15px; border-radius: 8px; background-color: var(--bg-primary); text-align: center; }
+        .analysis-box .score { font-size: 1.5rem; font-weight: 700; }
+        .score-bad { color: var(--accent-danger); } .score-good { color: var(--accent-secondary); }
+
+        .legend { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: center; align-items: center; gap: 20px; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+        .legend-color { width: 16px; height: 16px; border-radius: 3px; }
+
+        .btn {
+            display: inline-block;
+            background-color: var(--accent-primary);
+            color: var(--bg-primary);
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 700;
+            font-size: 1rem;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            margin-top: 10px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(88, 166, 255, 0.3);
+        }
+
+        /* --- CODE MODAL STYLES --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(13, 17, 23, 0.8);
+            backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-overlay.visible { opacity: 1; visibility: visible; }
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.visible .modal-content { transform: scale(1); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { color: white; margin: 0; }
+        .close-btn { background: none; border: none; color: var(--text-secondary); font-size: 2rem; cursor: pointer; }
+        pre {
+            background: var(--bg-primary);
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        /* Syntax Highlighting */
+        .code-comment { color: #8b949e; font-style: italic; }
+        .code-keyword { color: #ff7b72; }
+        .code-function { color: #d2a8ff; }
+        .code-string { color: #a5d6ff; }
+        .code-number { color: #79c0ff; }
+
+        footer { text-align: center; padding: 40px 20px; border-top: 1px solid var(--border-color); color: var(--text-secondary); }
+        
+        @media (max-width: 768px) {
+            body { line-height: 1.6; }
+            .hero-header h1 { font-size: 2.5rem; }
+            .report-section { padding: 25px; }
+            .case-study-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="hero-header">
+        <h1>Project Report: Compact Urban Model</h1>
+        <p class="subtitle">A Python program to model simplified city grids and demonstrate how layout changes affect neighborhood accessibility.</p>
+    </header>
+
+    <main class="container">
+        <section class="report-section">
+            <h2>Project Goal</h2>
+            <p>This project was built to explore a core question in urban planning: <strong>how can we measure the quality of a city's layout?</strong> My goal was to create a simple yet powerful tool to quantify how planning decisions impact the daily lives of residents.</p>
+            <p>Using a simplified grid-based representation of a city, the model calculates an "Accessibility Score" to show how walkable and convenient a neighborhood is. It's designed to be a clear and direct way to test planning ideas.</p>
+        </section>
+
+        <section class="report-section">
+            <h2>My Approach</h2>
+            <p>The model's logic is straightforward and built on a few key ideas.</p>
+            
+            <h3>1. The Grid System</h3>
+            <p>The city is modeled as a 2D grid. Each cell is a parcel of land that can be assigned a specific type, like a building, a park, or a road. This makes it easy to visualize the layout and for the program to process the spatial relationships.</p>
+
+            <h3>2. The Proximity Algorithm</h3>
+            <p>The main function of the program is to calculate accessibility. It checks each residential building to see if it is within a reasonable walking distance of essential amenities. The final score is the percentage of homes that are well-served, giving a clear metric for how good the layout is.</p>
+            
+            <button id="view-code-btn" class="btn">View Python Code</button>
+        </section>
+
+        <section class="report-section">
+            <h2>Case Study: Centralization vs. Dispersion</h2>
+            <p>To show the model in action, I ran a simple comparison. I created two city layouts with the exact same number of buildings. The only variable was the placement of the amenities and commercial zones.</p>
+
+            <div class="case-study-grid">
+                <div class="scenario">
+                    <h4>Scenario A: Dispersed Layout</h4>
+                    <div class="city-diagram">
+                        <div class="plot res" style="grid-area: 2/2/4/4;"></div><div class="plot res" style="grid-area: 5/2/7/4;"></div><div class="plot res" style="grid-area: 8/2/10/4;"></div><div class="plot road" style="grid-area: 1/5/11/6;"></div><div class="plot com" style="grid-area: 2/7/4/9;"></div><div class="plot com" style="grid-area: 5/7/7/9;"></div><div class="plot park" style="grid-area: 8/7/10/9;"><div class="tree"></div><div class="tree"></div><div class="tree"></div><div class="tree"></div></div><div class="plot transit" style="grid-area: 1/1/2/2;">T</div>
+                    </div>
+                    <div class="analysis-box"><div>Accessibility Score</div><div class="score score-bad">15%</div></div>
+                </div>
+                <div class="scenario">
+                    <h4>Scenario B: Compact Layout</h4>
+                    <div class="city-diagram">
+                        <div class="plot res" style="grid-area: 1/1/3/3;"></div><div class="plot res" style="grid-area: 1/4/3/6;"></div><div class="plot res" style="grid-area: 1/7/3/9;"></div><div class="plot road" style="grid-area: 1/3/11/4;"></div><div class="plot road" style="grid-area: 1/6/11/7;"></div><div class="plot road" style="grid-area: 3/1/4/11;"></div><div class="plot road" style="grid-area: 6/1/7/11;"></div><div class="plot com" style="grid-area: 4/1/6/3;"></div><div class="plot skyscraper" style="grid-area: 4/4/6/6;"><div class="window"></div><div class="window"></div><div class="window"></div><div class="window"></div></div><div class="plot com" style="grid-area: 4/7/6/9;"></div><div class="plot park" style="grid-area: 7/1/9/3;"><div class="tree"></div><div class="tree"></div><div class="tree"></div><div class="tree"></div></div><div class="plot transit" style="grid-area: 7/4/9/6;">T</div><div class="plot res" style="grid-area: 7/7/9/9;"></div><div class="plot res" style="grid-area: 9/1/11/3;"></div><div class="plot res" style="grid-area: 9/7/11/9;"></div>
+                    </div>
+                    <div class="analysis-box"><div>Accessibility Score</div><div class="score score-good">95%</div></div>
+                </div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item"><div class="legend-color res"></div> Residence</div><div class="legend-item"><div class="legend-color skyscraper"></div> Skyscraper</div><div class="legend-item"><div class="legend-color com"></div> Commercial</div><div class="legend-item"><div class="legend-color park"></div> Park</div><div class="legend-item"><div class="legend-color transit"></div> Transit Hub</div><div class="legend-item"><div class="legend-color road"></div> Road</div>
+            </div>
+        </section>
+
+        <section class="report-section">
+            <h2>Conclusion</h2>
+            <p>The Compact Urban Model was a successful project that achieved its goal. It provides a functional and logical way to measure the quality of urban design using a clear, data-driven approach. It successfully demonstrates how a simple Python program can be used to model and solve complex, real-world problems.</p>
+        </section>
+    </main>
+
+    <footer>
+        <p>Project by Chetan Suralkar</p>
+    </footer>
+
+    <!-- MODAL FOR PYTHON CODE -->
+    <div id="code-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Python Source Code</h3>
+                <button id="close-modal-btn" class="close-btn">&times;</button>
+            </div>
+            <pre><code id="python-code"></code></pre>
+        </div>
+    </div>
+
+    <!-- SCRIPT FOR INTERACTIONS -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Scroll-in animations
+            const sections = document.querySelectorAll('.report-section');
+            const observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+            sections.forEach(section => observer.observe(section));
+
+            // Modal functionality
+            const viewCodeBtn = document.getElementById('view-code-btn');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            const codeModal = document.getElementById('code-modal');
+            const pythonCodeEl = document.getElementById('python-code');
+
+            const pythonCode = `
+<span class="code-comment"># A very simple script to check city layouts.</span>
+
+<span class="code-comment"># City layouts are represented as a list of strings.</span>
+<span class="code-comment"># 'R'=House, 'P'=Park, 'T'=Transit, ' '=Empty</span>
+dispersed_layout = [
+    <span class="code-string">"T      P  "</span>,
+    <span class="code-string">"RR    R "</span>,
+    <span class="code-string">"R      R "</span>,
+    <span class="code-string">"       R "</span>,
+    <span class="code-string">"R         "</span>,
+    <span class="code-string">"R         "</span>,
+    <span class="code-string">"R         "</span>,
+    <span class="code-string">"RR     R "</span>,
+    <span class="code-string">"R      R "</span>,
+    <span class="code-string">"R      R "</span>,
+]
+
+compact_layout = [
+    <span class="code-string">"          "</span>,
+    <span class="code-string">" R R R R  "</span>,
+    <span class="code-string">"          "</span>,
+    <span class="code-string">" R  PT  R "</span>,
+    <span class="code-string">" R      R "</span>,
+    <span class="code-string">" R      R "</span>,
+    <span class="code-string">"          "</span>,
+    <span class="code-string">" R R R R  "</span>,
+    <span class="code-string">"          "</span>,
+    <span class="code-string">"          "</span>,
+]
+
+<span class="code-keyword">def</span> <span class="code-function">check_accessibility</span>(grid, walk_dist=<span class="code-number">4</span>):
+    <span class="code-string">"""Calculates the percentage of houses with access to both a park and transit."""</span>
+    
+    houses = [(x, y) <span class="code-keyword">for</span> y, row <span class="code-keyword">in</span> enumerate(grid) <span class="code-keyword">for</span> x, cell <span class="code-keyword">in</span> enumerate(row) <span class="code-keyword">if</span> cell == <span class="code-string">'R'</span>]
+    parks = [(x, y) <span class="code-keyword">for</span> y, row <span class="code-keyword">in</span> enumerate(grid) <span class="code-keyword">for</span> x, cell <span class="code-keyword">in</span> enumerate(row) <span class="code-keyword">if</span> cell == <span class="code-string">'P'</span>]
+    transits = [(x, y) <span class="code-keyword">for</span> y, row <span class="code-keyword">in</span> enumerate(grid) <span class="code-keyword">for</span> x, cell <span class="code-keyword">in</span> enumerate(row) <span class="code-keyword">if</span> cell == <span class="code-string">'T'</span>]
+
+    <span class="code-keyword">if not</span> houses:
+        <span class="code-keyword">return</span> <span class="code-number">0</span>
+
+    good_houses = <span class="code-number">0</span>
+    <span class="code-keyword">for</span> hx, hy <span class="code-keyword">in</span> houses:
+        has_park = any(abs(hx - px) + abs(hy - py) <= walk_dist <span class="code-keyword">for</span> px, py <span class="code-keyword">in</span> parks)
+        has_transit = any(abs(hx - tx) + abs(hy - ty) <= walk_dist <span class="code-keyword">for</span> tx, ty <span class="code-keyword">in</span> transits)
+
+        <span class="code-keyword">if</span> has_park <span class="code-keyword">and</span> has_transit:
+            good_houses += <span class="code-number">1</span>
+            
+    <span class="code-keyword">return</span> (good_houses / len(houses)) * <span class="code-number">100</span>
+
+<span class="code-comment"># --- Run the check and print the scores ---</span>
+dispersed_score = check_accessibility(dispersed_layout)
+<span class="code-function">print</span>(f<span class="code-string">"Dispersed Layout Score: {int(dispersed_score)}%"</span>)
+
+compact_score = check_accessibility(compact_layout)
+<span class="code-function">print</span>(f<span class="code-string">"Compact Layout Score: {int(compact_score)}%"</span>)
+`;
+            pythonCodeEl.innerHTML = pythonCode.trim();
+
+            viewCodeBtn.addEventListener('click', () => {
+                codeModal.classList.add('visible');
+            });
+            closeModalBtn.addEventListener('click', () => {
+                codeModal.classList.remove('visible');
+            });
+            codeModal.addEventListener('click', (e) => {
+                if (e.target === codeModal) {
+                    codeModal.classList.remove('visible');
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
